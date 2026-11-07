@@ -29,7 +29,7 @@ def read_fasta(path: Path):
         yield record.id, str(record.seq)
 
 
-def encode_str(seq: str) -> np.ndarray:
+def encode_str(seq: str) -> np.array:
     """Encode as string into a numpy array, using a 256-entry lookup table."""
 
     raw = np.frombuffer(seq.encode("ascii", errors="replace"), dtype=np.uint8)

@@ -60,7 +60,7 @@ Convert DNA strings into NumPy `uint8` arrays (`A=0, C=1, G=2, T=3`, other chara
 
 | Function | Purpose |
 |---|---|
-| `encode(seq)` | String → `uint8` array |
+| `encode_str(seq)` | String → `uint8` array |
 | `revcomp(enc)` | Reverse complement in encoded space (`3 - x`, reversed; `N` stays `N`) |
 
 ### 3. Index construction (once)
@@ -68,15 +68,11 @@ Compute every k-mer of the reference as a 2-bit-packed `uint32` integer (k ≤ 1
 
 | Function | Purpose |
 |---|---|
-| `kmer_codes(enc, k)` | Vectorized rolling 2-bit k-mer codes + validity mask |
+| `hash_kmers(enc, k)` | Hash the k-mers into 2-bit codes + validity mask for reads containing "N"|
 | `build_index(ref_enc, k)` | Returns `sorted_codes` and `positions` arrays |
-
-Memory: ~160 MB for a 20 Mbp reference.
 
 ### 4. Read encoding
 Encode the read and its reverse complement; both strands are mapped and the better result is kept.
-
-*(Uses `encode` and `revcomp` from step 2.)*
 
 ### 5. Seeding
 Compute all k-mers of the read and look them all up at once with `np.searchsorted`. Over-represented k-mers (more than `MAX_OCC` occurrences, typically repeats) are ignored. Each match becomes a hit `(ref_pos, read_pos)`.
