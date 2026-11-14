@@ -9,6 +9,8 @@
 ---
 6. Finding hits in the reference of a given sequence
 ---
+11. Evaluation script (`evaluate.py`): compare the output with the expected results (% mapped, % wrongly mapped within 20 bp, time per read).
+---
 
 ## TODO:
 5. Reverse complement so reads from both strands can be mapped.
@@ -20,8 +22,6 @@
 9. Run mapping, accept only if edit distance ≤ `MAX_ERR_RATE` × read length and the best candidate beats the runner-up by `MIN_ED_GAP`.
 ---
 10. Run `main.py` end to end on `files/example_files1` and check the output format and the `.log` file.
----
-11. Evaluation script (`evaluate.py`): compare the output with the expected results (% mapped, % wrongly mapped within 20 bp, time per read).
 ---
 12. Tune the parameters in `config.py` (`K`, `MAX_OCC`, `BAND`, `MIN_VOTES`, `MARGIN`, `MAX_ERR_RATE`, `MIN_ED_GAP`) against the targets: ≥ 80% mapped, ≤ 1% wrong, ≤ 100 + 3r seconds, < 1 GB memory.
 ---
