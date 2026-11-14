@@ -13,7 +13,7 @@
 ---
 
 ## TODO:
-5. Reverse complement so reads from both strands can be mapped.
+(SKIPUJEMY, POMYSŁ CLAUDE) 5. Reverse complement so reads from both strands can be mapped.
 ---
 7. Diagonal voting: compute `ref_pos - read_pos` for each hit, find the densest `BAND`-wide window and the best non-overlapping runner-up.
 ---
