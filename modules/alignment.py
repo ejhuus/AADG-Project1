@@ -38,22 +38,81 @@ def find_hits(read_enc: np.array, index: tuple[np.array, np.array]) -> tuple[np.
 
     return ref_pos, read_pos
 
-def semiglobal_dp(read, window):
-    """Fill the DP matrix (zero first row); return (D, edit_distance, end_col)."""
-    raise NotImplementedError
+def semiglobal_dp(read: np.array, window: np.array) -> tuple[np.array, int, int]:
+    """Fill the DP matrix (zero first row); return (D, edit_distance, end_col).
+
+    D[i][j] = edit distance between read[:i] and the best substring of window ending at j.
+    The zero first row lets the read start anywhere in the window; the minimum of the
+    last row lets it end anywhere.
+    """
+
+    m, n = len(read), len(window)
+    cols = np.arange(n + 1, dtype=np.int32)
+
+    D = np.empty((m + 1, n + 1), dtype=np.int32)
+    D[0] = 0
+
+    # Substitution cost for every (read base, window base) pair; N never matches.
+    cost = ((read[:, None] != window[None, :]) | (read[:, None] == 4)).astype(np.int32)
+
+    t = np.empty(n + 1, dtype=np.int32)
+    for i in range(1, m + 1):
+        prev = D[i - 1]
+        # Diagonal (match/mismatch) and up (read base vs. gap) terms come from the previous row.
+        t[0] = i
+        np.minimum(prev[:-1] + cost[i - 1], prev[1:] + 1, out=t[1:])
+        # Left term: D[i][j] = min_k (t[k] + j - k), so D[i][j] - j = running min of t[k] - k.
+        row = D[i]
+        np.subtract(t, cols, out=row)
+        np.minimum.accumulate(row, out=row)
+        row += cols
+
+    end_col = int(np.argmin(D[m]))
+    return D, int(D[m, end_col]), end_col
 
 
-def traceback(D, read, window, end_col):
-    """Return the start column of the alignment ending at end_col."""
-    raise NotImplementedError
+def traceback(D: np.array, read: np.array, window: np.array, end_col: int) -> int:
+    """Return the start column of the alignment ending at end_col.
+
+    Walks back from (len(read), end_col) to row 0, preferring the diagonal move.
+    The alignment then covers window[start_col:end_col].
+    """
+
+    read, window = read.tolist(), window.tolist()
+    i, j = len(read), end_col
+
+    while i > 0:
+        d = D[i, j]
+        if j > 0:
+            r, w = read[i - 1], window[j - 1]
+            if d == D[i - 1, j - 1] + (r != w or r == 4):
+                i, j = i - 1, j - 1
+                continue
+        if d == D[i - 1, j] + 1:
+            i -= 1
+        else:
+            j -= 1
+
+    return j
 
 
-def verify(candidate, ref_enc):
+def verify(candidate: tuple[np.array, int], ref_enc: np.array) -> tuple[int, int, int]:
     """Build the reference window, run DP, return (edit_distance, start, end).
 
-    candidate is (read_enc, est_start); start/end are reference coordinates.
+    candidate is (read_enc, est_start); start/end are reference coordinates,
+    the alignment covers ref_enc[start:end].
     """
-    raise NotImplementedError
+
+    read_enc, est_start = candidate
+
+    lo = max(0, est_start - MARGIN)
+    hi = min(len(ref_enc), est_start + len(read_enc) + MARGIN)
+    window = ref_enc[lo:hi]
+
+    D, edit_distance, end_col = semiglobal_dp(read_enc, window)
+    start_col = traceback(D, read_enc, window, end_col)
+
+    return edit_distance, lo + start_col, lo + end_col
 
 
 def best_diagonals(ref_pos: np.array, read_pos: np.array) -> list[tuple[int, int]]:

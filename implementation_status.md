@@ -13,11 +13,11 @@
 ---
 11. Evaluation script (`evaluate.py`): compare the output with the expected results (% mapped, % wrongly mapped within 20 bp, time per read).
 ---
+8. Semi-global edit-distance DP fill the DP row by row with NumPy, get the edit distance and end from the last row, the start from the traceback.
+---
 
 ## TODO:
 (SKIPUJEMY, POMYSŁ CLAUDE) 5. Reverse complement so reads from both strands can be mapped.
----
-8. Semi-global edit-distance DP fill the DP row by row with NumPy, get the edit distance and end from the last row, the start from the traceback.
 ---
 9. Run mapping, accept only if edit distance ≤ `MAX_ERR_RATE` × read length and the best candidate beats the runner-up by `MIN_ED_GAP`.
 ---
