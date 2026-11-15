@@ -39,7 +39,7 @@ Index all reference k-mers in a sorted table, find exact k-mer seeds for each re
 reference.fasta ─► [1] Read FASTA ─► [2] Encode ─► [3] Build k-mer index   (once)
                                                             │
 reads.fasta ─► [1] Read FASTA ─► for each read:             ▼
-                 [4] Encode read + reverse complement
+                 [4] Encode read
                  [5] Seeding        → exact k-mer hits (ref_pos, read_pos)
                  [6] Diagonal voting → candidate locations
                  [7] DP verification → edit distance, start, end
@@ -61,7 +61,6 @@ Convert DNA strings into NumPy `uint8` arrays (`A=0, C=1, G=2, T=3`, other chara
 | Function | Purpose |
 |---|---|
 | `encode_str(seq)` | String → `uint8` array |
-| `revcomp(enc)` | Reverse complement in encoded space (`3 - x`, reversed; `N` stays `N`) |
 
 ### 3. Index construction (once)
 Compute every k-mer of the reference as a 2-bit-packed `uint32` integer (k ≤ 16), mask out k-mers containing `N`, and sort them with `np.argsort`. All occurrences of the same k-mer are then contiguous, so any k-mer can be found by binary search, just as in a suffix array.
@@ -72,7 +71,7 @@ Compute every k-mer of the reference as a 2-bit-packed `uint32` integer (k ≤ 1
 | `build_index(ref_enc, k)` | Returns `sorted_codes` and `positions` arrays |
 
 ### 4. Read encoding
-Encode the read and its reverse complement; both strands are mapped and the better result is kept.
+Encode the read with the same lookup table as the reference. Only the forward strand is mapped.
 
 ### 5. Seeding
 Compute all k-mers of the read and look them all up at once with `np.searchsorted`. Over-represented k-mers (more than `MAX_OCC` occurrences, typically repeats) are ignored. Each match becomes a hit `(ref_pos, read_pos)`.

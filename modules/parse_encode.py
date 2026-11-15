@@ -36,8 +36,3 @@ def encode_str(seq: str) -> np.array:
 
     return LUT[raw]
 
-
-def revcomp(enc):
-    """Reverse complement in encoded space (3 - x, reversed; N stays N)."""
-    raise NotImplementedError
-
