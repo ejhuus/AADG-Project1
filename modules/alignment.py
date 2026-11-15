@@ -1,7 +1,7 @@
 """Module for finding hits and alignment of the reads."""
 
 import numpy as np
-from modules.config import MARGIN, MAX_OCC, K
+from modules.config import BAND, MARGIN, MAX_OCC, K
 from modules.index import hash_kmers
 
 
@@ -56,10 +56,37 @@ def verify(candidate, ref_enc):
     raise NotImplementedError
 
 
-def best_diagonals(ref_pos, read_pos):
+def best_diagonals(ref_pos: np.array, read_pos: np.array) -> list[tuple[int, int]]:
     """Return the top candidate windows as a list of (est_start, votes).
 
     The first entry is the densest BAND-wide window of diagonals, the second
     (if any) is the best non-overlapping runner-up.
     """
-    raise NotImplementedError
+
+    if len(ref_pos) == 0:
+        return []
+
+    # Each hit votes for the diagonal ref_pos - read_pos (= estimated read start in the reference).
+    # int64 because the positions are unsigned and the difference can be negative.
+    diag = np.sort(ref_pos.astype(np.int64) - read_pos.astype(np.int64))
+
+    # Window i covers diagonals [diag[i], diag[i] + BAND); ends[i] is the first hit past it,
+    # so votes[i] = number of hits in window i.
+    ends = np.searchsorted(diag, diag + BAND, side="left")
+    votes = ends - np.arange(len(diag))
+
+    def candidate(i):
+        # Median diagonal of the window: robust to the indel drift at the edges.
+        return int(diag[(i + ends[i] - 1) // 2]), int(votes[i])
+
+    best = int(np.argmax(votes))
+    candidates = [candidate(best)]
+
+    # Runner-up: best window that does not overlap the best one.
+    lo, hi = diag[best], diag[best] + BAND
+    outside = (diag + BAND <= lo) | (diag >= hi)
+    if outside.any():
+        second = int(np.argmax(np.where(outside, votes, 0)))
+        candidates.append(candidate(second))
+
+    return candidates

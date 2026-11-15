@@ -9,13 +9,13 @@
 ---
 6. Finding hits in the reference of a given sequence
 ---
+7. Diagonal voting: compute `ref_pos - read_pos` for each hit, find the densest `BAND`-wide window and the best non-overlapping runner-up.
+---
 11. Evaluation script (`evaluate.py`): compare the output with the expected results (% mapped, % wrongly mapped within 20 bp, time per read).
 ---
 
 ## TODO:
 (SKIPUJEMY, POMYSŁ CLAUDE) 5. Reverse complement so reads from both strands can be mapped.
----
-7. Diagonal voting: compute `ref_pos - read_pos` for each hit, find the densest `BAND`-wide window and the best non-overlapping runner-up.
 ---
 8. Semi-global edit-distance DP fill the DP row by row with NumPy, get the edit distance and end from the last row, the start from the traceback.
 ---
