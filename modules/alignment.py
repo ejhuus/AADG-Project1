@@ -27,15 +27,16 @@ def find_hits(read_enc: np.array, index: tuple[np.array, np.array]) -> tuple[np.
     keep = (counts > 0) & (counts <= MAX_OCC)
     lo, counts, read_kmer_pos = lo[keep], counts[keep], read_kmer_pos[keep]
 
-    read_pos, idx = [], []
-    for p, l, c in zip(read_kmer_pos, lo, counts):
-        # If we have multiple k-mer hits in the reference make a list where every hit is represented in it
-        for t in range(c):
-            read_pos.append(p)
-            idx.append(l + t)
+    # Expand every k-mer into one hit per reference occurrence, i.e. k-mer i contributes
+    # index entries lo[i], lo[i]+1, ..., lo[i]+counts[i]-1, all paired with read_kmer_pos[i].
+    # offsets[i] = where k-mer i's block starts in the flat output (exclusive cumulative sum).
+    offsets = np.cumsum(counts) - counts
+    read_pos = np.repeat(read_kmer_pos, counts)
+    # Flat output slot h belongs to k-mer i: idx = lo[i] + (h - offsets[i])
+    idx = np.repeat(lo - offsets, counts) + np.arange(counts.sum())
     ref_pos = positions[idx]
 
-    return np.array(ref_pos), np.array(read_pos)
+    return ref_pos, read_pos
 
 def semiglobal_dp(read, window):
     """Fill the DP matrix (zero first row); return (D, edit_distance, end_col)."""
