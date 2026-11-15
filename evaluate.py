@@ -66,7 +66,10 @@ def peak_memory_mb():
     except ImportError:
         return None
     peak = resource.getrusage(resource.RUSAGE_CHILDREN).ru_maxrss
-    return peak / 1024  
+    # ru_maxrss is in bytes on macOS and in kilobytes on Linux
+    if sys.platform == "darwin":
+        return peak / 1024 / 1024
+    return peak / 1024
 
 
 def compare(output, expected):

@@ -1,7 +1,8 @@
 """Module for finding hits and alignment of the reads."""
 
 import numpy as np
-from modules.config import BAND, MARGIN, MAX_OCC, K
+
+from modules.config import BAND, MARGIN, MAX_ERR_RATE, MAX_OCC, MIN_ED_GAP, MIN_VOTES, SAME_LOCUS, K
 from modules.index import hash_kmers
 
 
@@ -149,3 +150,33 @@ def best_diagonals(ref_pos: np.array, read_pos: np.array) -> list[tuple[int, int
         candidates.append(candidate(second))
 
     return candidates
+
+
+def map_read(read_enc: np.array, index: tuple[np.array, np.array], ref_enc: np.array) -> tuple[int, int] | None:
+    """Map one read; return (start, end) in the reference or None if unmapped.
+
+    Seeds -> diagonal voting -> DP on the candidates with at least MIN_VOTES hits.
+    The best alignment is accepted only if its error rate is at most MAX_ERR_RATE
+    and it beats any other location by at least MIN_ED_GAP edits.
+    """
+
+    candidates = best_diagonals(*find_hits(read_enc, index))
+    candidates = [c for c in candidates if c[1] >= MIN_VOTES]
+    if not candidates:
+        return None
+
+    # (edit_distance, start, end) for each candidate, best alignment first.
+    alignments = sorted(verify((read_enc, est_start), ref_enc) for est_start, _ in candidates)
+    edit_distance, start, end = alignments[0]
+
+    if edit_distance > MAX_ERR_RATE * len(read_enc):
+        return None
+
+    # A runner-up landing on the same spot comes from hits spilling past the voting window,
+    # not from a second copy, so it does not make the read ambiguous.
+    if len(alignments) > 1:
+        ed2, start2, _ = alignments[1]
+        if abs(start2 - start) > SAME_LOCUS and ed2 - edit_distance < MIN_ED_GAP:
+            return None
+
+    return start, end

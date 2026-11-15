@@ -7,10 +7,10 @@ import logging
 import os
 import time
 
+from modules.alignment import map_read
 from modules.config import K
-from modules.parse_encode import read_reference, read_fasta, encode_str
 from modules.index import build_index
-from modules.alignment import find_hits
+from modules.parse_encode import encode_str, read_fasta, read_reference
 
 
 def setup_logging(output_path):
@@ -36,7 +36,7 @@ def main():
     t_start = time.perf_counter()
 
     # Index and sort the reference reads.
-    
+
     ref_encoded = encode_str(read_reference(args.reference))
     logging.info("Reference loaded: %d bp", len(ref_encoded))
     t0 = time.perf_counter()
@@ -46,13 +46,13 @@ def main():
 
     # Map each read to the reference.
     total_reads = 0
-    mapped_reads = 0
+    n_mapped = 0
     t0 = time.perf_counter()
 
     with open(args.output, "w") as out:
         for read_id, seq in read_fasta(args.reads):
             total_reads += 1
-            hits = find_hits(encode_str(seq), index)
+            result = map_read(encode_str(seq), index, ref_encoded)
             if result is not None:
                 start, end = result
                 out.write(f"{read_id}\t{start}\t{end}\n")

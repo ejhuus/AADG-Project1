@@ -7,3 +7,4 @@ MIN_VOTES = 10       # minimum seed hits to consider a location
 MARGIN = 120         # extra reference on each side of the DP window (bp)
 MAX_ERR_RATE = 0.16  # maximum accepted edit distance / read length
 MIN_ED_GAP = 10      # required edit-distance gap between best and runner-up
+SAME_LOCUS = 20      # runner-up aligning within this many bp of the best is the same location
