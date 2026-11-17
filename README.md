@@ -7,8 +7,10 @@ A seed-and-extend read mapper for long, noisy reads (~1 kbp, 5–10% errors) aga
 ## Usage
 
 ```bash
-python3 mapper.py reference.fasta reads.fasta output.txt
+python3 main.py reference.fasta reads.fasta output.txt
 ```
+
+Requires Python ≥ 3.12, NumPy and Biopython (see `pyproject.toml`).
 
 | Argument | Description |
 |---|---|
@@ -24,7 +26,7 @@ One tab-separated line per **mapped** read (unmapped reads are omitted):
 <read_id>    <start>    <end>
 ```
 
-Progress and timing information is printed and saved in `.log` file.
+Progress and timing information is printed and also saved to `<output>.log` (e.g. `output.log` for `output.txt`).
 
 ---
 
@@ -47,34 +49,34 @@ reads.fasta ─► [1] Read FASTA ─► for each read:             ▼
                  [9] Write output line
 ```
 
-### 1. Input — FASTA parsing
-Parse the reference into a single sequence and stream the reads as `(id, sequence)` pairs.
+### 1. Input — FASTA parsing (`modules/parse_encode.py`)
+Parse the reference into a single sequence and stream the reads as `(id, sequence)` pairs, using Biopython's `SeqIO`.
 
 | Function | Purpose |
 |---|---|
-| `read_reference(path)` | Read the reference sequence (concatenate lines) |
+| `read_reference(path)` | Read the single reference record as a string |
 | `read_fasta(path)` | Generator yielding `(read_id, sequence)` |
 
-### 2. Encoding
+### 2. Encoding (`modules/parse_encode.py`)
 Convert DNA strings into NumPy `uint8` arrays (`A=0, C=1, G=2, T=3`, other characters such as `N` = 4) using a 256-entry lookup table, so all later steps can be vectorized.
 
 | Function | Purpose |
 |---|---|
 | `encode_str(seq)` | String → `uint8` array |
 
-### 3. Index construction (once)
-Compute every k-mer of the reference as a 2-bit-packed `uint32` integer (k ≤ 16), mask out k-mers containing `N`, and sort them with `np.argsort`. All occurrences of the same k-mer are then contiguous, so any k-mer can be found by binary search, just as in a suffix array.
+### 3. Index construction (once, `modules/index.py`)
+Compute every k-mer of the reference as a 2-bit-packed `uint32` integer (k ≤ 16), mask out k-mers containing `N`, and sort them with a stable `np.argsort` (positions of equal k-mers stay ascending). All occurrences of the same k-mer are then contiguous, so any k-mer can be found by binary search, just as in a suffix array.
 
 | Function | Purpose |
 |---|---|
-| `hash_kmers(enc, k)` | Hash the k-mers into 2-bit codes + validity mask for reads containing "N"|
+| `hash_kmers(enc, k)` | Hash the k-mers into 2-bit codes + validity mask (`False` for k-mers containing `N`) |
 | `build_index(ref_enc, k)` | Returns `sorted_codes` and `positions` arrays |
 
 ### 4. Read encoding
 Encode the read with the same lookup table as the reference. Only the forward strand is mapped.
 
-### 5. Seeding
-Compute all k-mers of the read and look them all up at once with `np.searchsorted`. Over-represented k-mers (more than `MAX_OCC` occurrences, typically repeats) are ignored. Each match becomes a hit `(ref_pos, read_pos)`.
+### 5. Seeding (`modules/alignment.py`)
+Compute all k-mers of the read and look them all up at once with `np.searchsorted`. K-mers absent from the reference and over-represented k-mers (more than `MAX_OCC` occurrences, typically repeats) are ignored. Each match becomes a hit `(ref_pos, read_pos)`.
 
 | Function | Purpose |
 |---|---|
@@ -82,34 +84,34 @@ Compute all k-mers of the read and look them all up at once with `np.searchsorte
 
 With 10% errors and k = 15, a true location gets on the order of 100–200 hits, while random hits are scattered (~0.02 per k-mer).
 
-### 6. Candidate selection — diagonal voting
-Each hit votes for the diagonal `ref_pos - read_pos` (the estimated read start). Hits from the true location share nearly the same diagonal, shifted only slightly by indels. A sliding window of width `BAND` over the sorted diagonals finds the densest cluster and the best non-overlapping runner-up.
+### 6. Candidate selection — diagonal voting (`modules/alignment.py`)
+Each hit votes for the diagonal `ref_pos - read_pos` (the estimated read start). Hits from the true location share nearly the same diagonal, shifted only slightly by indels. A sliding window of width `BAND` over the sorted diagonals finds the densest cluster and the best non-overlapping runner-up. Each candidate's estimated start is the median diagonal of its window, which is robust to indel drift at the window edges.
 
 | Function | Purpose |
 |---|---|
-| `best_diagonals(ref_pos, read_pos)` | Returns the top candidate windows `(est_start, votes)` |
+| `best_diagonals(ref_pos, read_pos)` | Returns up to two candidate windows `(est_start, votes)`, best first |
 
-Reads whose best window has fewer than `MIN_VOTES` hits are reported as unmapped immediately.
+Candidates with fewer than `MIN_VOTES` hits are discarded; if none remain, the read is unmapped.
 
-### 7. Verification — semi-global edit-distance DP
+### 7. Verification — semi-global edit-distance DP (`modules/alignment.py`)
 For each surviving candidate, extract the reference window `[est_start - MARGIN, est_start + len(read) + MARGIN]` and run edit-distance DP with a zero first row (the read may start anywhere in the window). Each row is computed with NumPy: the up/diagonal terms come from the previous row, and the left-neighbour term is resolved with a running minimum:
 
 ```
 D[i][j] - j = min(t[j] - j, D[i][j-1] - (j-1))   →   np.minimum.accumulate
 ```
 
-The minimum of the last row gives the edit distance and the end position; a traceback gives the start position.
+`N` never matches any base. The minimum of the last row gives the edit distance and the end position; a traceback (preferring diagonal moves) gives the start position.
 
 | Function | Purpose |
 |---|---|
 | `semiglobal_dp(read, window)` | Fills the DP matrix; returns `(D, edit_distance, end_col)` |
 | `traceback(D, read, window, end_col)` | Returns the start column of the alignment |
-| `verify(candidate, ref_enc)` | Builds the window, runs DP, returns `(edit_distance, start, end)` |
+| `verify((read_enc, est_start), ref_enc)` | Builds the window, runs DP, returns `(edit_distance, start, end)` in reference coordinates |
 
-### 8. Decision
+### 8. Decision (`modules/alignment.py`)
 Accept the best candidate only if:
 - its edit distance is at most `MAX_ERR_RATE × read_length`, and
-- it is clearly better than the runner-up, by at least `MIN_ED_GAP` (avoids mapping repeats to the wrong copy).
+- it is clearly better than the runner-up, by at least `MIN_ED_GAP` edits (avoids mapping repeats to the wrong copy). A runner-up starting within `SAME_LOCUS` bp of the best alignment is the same location (seed hits spilling past the voting window), so it does not make the read ambiguous.
 
 Otherwise the read is left unmapped. Leaving a read unmapped is preferred over risking an incorrect mapping.
 
@@ -117,26 +119,28 @@ Otherwise the read is left unmapped. Leaving a read unmapped is preferred over r
 |---|---|
 | `map_read(read_enc, index, ref_enc)` | Runs steps 4–8 for one read; returns `(start, end)` or `None` |
 
-### 9. Output
+### 9. Output (`main.py`)
 | Function | Purpose |
 |---|---|
 | `main()` | Parses arguments, builds the index, loops over the reads, writes results, logs timings |
+| `setup_logging(output_path)` | Logs to stdout and to `<output>.log` |
 
 ---
 
 ## Parameters
 
-Defined as constants at the top of `mapper.py`.
+Defined as constants in `modules/config.py`.
 
-| Parameter | Typical value | Meaning |
-|---|---|---|
-| `K` | 13–15 | k-mer (seed) length |
-| `MAX_OCC` | 20–50 | Ignore k-mers occurring more often than this |
-| `BAND` | 60–100 bp | Width of the diagonal voting window |
-| `MIN_VOTES` | 8–15 | Minimum seed hits to consider a location |
-| `MARGIN` | 100–150 bp | Extra reference on each side of the DP window |
-| `MAX_ERR_RATE` | 0.15–0.17 | Maximum accepted edit distance / read length |
-| `MIN_ED_GAP` | tuned | Required edit-distance gap between best and second-best candidate |
+| Parameter | Current value | Typical range | Meaning |
+|---|---|---|---|
+| `K` | 15 | 13–15 | k-mer (seed) length (≤ 16, codes are `uint32`) |
+| `MAX_OCC` | 30 | 20–50 | Ignore k-mers occurring more often than this in the reference |
+| `BAND` | 80 bp | 60–100 bp | Width of the diagonal voting window |
+| `MIN_VOTES` | 10 | 8–15 | Minimum seed hits to consider a location |
+| `MARGIN` | 120 bp | 100–150 bp | Extra reference on each side of the DP window |
+| `MAX_ERR_RATE` | 0.16 | 0.15–0.17 | Maximum accepted edit distance / read length |
+| `MIN_ED_GAP` | 10 | tuned | Required edit-distance gap between best and runner-up |
+| `SAME_LOCUS` | 20 bp | tuned | A runner-up within this distance of the best is the same location |
 
 ---
 
@@ -157,10 +161,19 @@ Assignment limits: total time ≤ 100 + 3r seconds, memory < 1 GB, ≥ 80% of ma
 ## Repository structure
 
 ```
-mapper.py      # the mapper (all steps above, organized in sections)
-evaluate.py    # helper: compares output with expected results (% mapped, % wrong, time per read)
-slides/        # presentation describing the approach
-AI_USAGE.md    # scope of AI usage and list of prompts
+main.py                    # entry point: argument parsing, logging, mapping loop (step 9)
+modules/
+  config.py                # tunable parameters
+  parse_encode.py          # FASTA parsing and encoding (steps 1–2, 4)
+  index.py                 # k-mer hashing and index construction (step 3)
+  alignment.py             # seeding, voting, DP verification, decision (steps 5–8)
+evaluate.py                # compares output with expected results (% mapped, % wrong, time per read)
+run_tests.py               # runs the mapper on all example sets and prints a summary table
+data/example_files1/       # 1 Mbp-scale reference and read sets (incl. unmappable reads)
+data/example_files2/       # 20 Mbp reference and read sets
+pyproject.toml             # dependencies (numpy, biopython)
+implementation_status.md   # progress notes
+AI_USAGE.md                # scope of AI usage and list of prompts
 README.md
 ```
 
