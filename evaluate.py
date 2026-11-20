@@ -57,7 +57,7 @@ def run_mapper(mapper, ref, reads, output):
     if result.returncode != 0:
         print("the mapper failed, exit code", result.returncode)
         sys.exit(1)
-    return elapsed
+    return elapsed, peak_memory_mb()
 
 
 def peak_memory_mb():
@@ -66,7 +66,6 @@ def peak_memory_mb():
     except ImportError:
         return None
     peak = resource.getrusage(resource.RUSAGE_CHILDREN).ru_maxrss
-    # ru_maxrss is in bytes on macOS and in kilobytes on Linux
     if sys.platform == "darwin":
         return peak / 1024 / 1024
     return peak / 1024
@@ -143,8 +142,7 @@ def main():
     if args.mapper:
         if not args.ref:
             parser.error("--mapper needs --ref")
-        elapsed = run_mapper(args.mapper, args.ref, args.reads, args.output)
-        memory = peak_memory_mb()
+        elapsed, memory = run_mapper(args.mapper, args.ref, args.reads, args.output)
 
     n_reads = count_reads(args.reads)
     output = read_coords(args.output)
@@ -191,27 +189,27 @@ def main():
         print("  >= 80% of mappable reads mapped:", "OK" if ok else "FAILED")
     ok = pct(len(wrong), n_out) <= 1
     ok_all = ok_all and ok
-    print("  <= 1% mapped incorrectly:        ", "OK" if ok else "FAILED")
+    print(" <= 1% mapped incorrectly: ", "OK" if ok else "FAILED")
     if elapsed is not None:
         ok = elapsed <= 100 + 3 * n_reads
         ok_all = ok_all and ok
-        print("  time <= 100 + 3r seconds:        ", "OK" if ok else "FAILED")
+        print("time <= 100 + 3r seconds:        ", "OK" if ok else "FAILED")
     else:
-        print("  time: unknown (use --time or --mapper)")
+        print("time: unknown (use --time or --mapper)")
     if memory is not None:
         ok = memory < 1024
         ok_all = ok_all and ok
-        print("  memory < 1 GB:                   ", "OK" if ok else "FAILED")
+        print("memory < 1 GB: ", "OK" if ok else "FAILED")
     else:
-        print("  memory: unknown (only measured with --mapper on linux/mac)")
+        print("memory: unknown (measured only with --mapper, on Linux)")
 
     print("\nestimated points:")
     p = points_correctness(pct(len(wrong), n_out))
-    print("  correctness: ", p, "/ 3")
+    print("correctness: ", p, "/ 3")
     if n_mappable > 0:
-        print("  completeness:", points_completeness(pct(mapped_mappable, n_mappable)), "/ 3")
+        print("completeness:", points_completeness(pct(mapped_mappable, n_mappable)), "/ 3")
     if sec_per_read is not None:
-        print("  time:        ", points_time(sec_per_read), "/ 3")
+        print("  time: ", points_time(sec_per_read), "/ 3")
     if not ok_all:
         print("\nsome of the minimum requirements are not met!")
 
