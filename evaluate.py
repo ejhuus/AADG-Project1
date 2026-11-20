@@ -1,11 +1,10 @@
-'''
-sposób wywołania kodu:
+"""
+How to run the code:
 
 python evaluate.py reads1.fasta output.txt reads1.txt
 python evaluate.py reads_unmappable.fasta output.txt
 python evaluate.py reads1.fasta output.txt reads1.txt --mapper main.py --ref reference.fasta
-
-'''
+"""
 
 
 import argparse
