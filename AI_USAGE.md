@@ -10,7 +10,7 @@ The AI was used as a helper, it helped with:
 - **Project scaffold**
 - **Implementing pipeline steps**
 - **README**
-- **Improving code**
+- **Improving and reviewing the code**
 
 ## Prompts
 
