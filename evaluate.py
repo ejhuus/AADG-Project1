@@ -165,14 +165,14 @@ def main():
           f"{pct(len(wrong), n_reads):.2f}% of all reads)")
     if len(correct) > 0:
         print(f"deviation of correct reads:  max {max(correct)} bp, mean {sum(correct) / len(correct):.1f} bp")
-
+ 
     if len(wrong) > 0:
         print("\nfirst wrong reads:")
         for read_id, reason in wrong[:10]:
             print("  ", read_id, "-", reason)
         if len(wrong) > 10:
             print("   ...", len(wrong) - 10, "more")
-
+ 
     sec_per_read = None
     if elapsed is not None and n_reads > 0:
         sec_per_read = elapsed / n_reads
@@ -180,7 +180,7 @@ def main():
         print(f"\ntime: {elapsed:.1f} s in total, {sec_per_read:.3f} s per read (limit {limit} s)")
     if memory is not None:
         print(f"peak memory of the mapper: {memory:.0f} MB (limit 1024 MB)")
-
+ 
     print("\nminimum requirements:")
     ok_all = True
     if n_mappable > 0:
@@ -189,30 +189,30 @@ def main():
         print("  >= 80% of mappable reads mapped:", "OK" if ok else "FAILED")
     ok = pct(len(wrong), n_out) <= 1
     ok_all = ok_all and ok
-    print(" <= 1% mapped incorrectly: ", "OK" if ok else "FAILED")
+    print("  <= 1% mapped incorrectly:        ", "OK" if ok else "FAILED")
     if elapsed is not None:
         ok = elapsed <= 100 + 3 * n_reads
         ok_all = ok_all and ok
-        print("time <= 100 + 3r seconds:        ", "OK" if ok else "FAILED")
+        print("  time <= 100 + 3r seconds:        ", "OK" if ok else "FAILED")
     else:
-        print("time: unknown (use --time or --mapper)")
+        print("  time: unknown (use --time or --mapper)")
     if memory is not None:
         ok = memory < 1024
         ok_all = ok_all and ok
-        print("memory < 1 GB: ", "OK" if ok else "FAILED")
+        print("  memory < 1 GB:                   ", "OK" if ok else "FAILED")
     else:
-        print("memory: unknown (measured only with --mapper, on Linux)")
-
+        print("  memory: unknown (measured only with --mapper, on Linux)")
+ 
     print("\nestimated points:")
     p = points_correctness(pct(len(wrong), n_out))
-    print("correctness: ", p, "/ 3")
+    print("  correctness: ", p, "/ 3")
     if n_mappable > 0:
-        print("completeness:", points_completeness(pct(mapped_mappable, n_mappable)), "/ 3")
+        print("  completeness:", points_completeness(pct(mapped_mappable, n_mappable)), "/ 3")
     if sec_per_read is not None:
-        print("  time: ", points_time(sec_per_read), "/ 3")
+        print("  time:        ", points_time(sec_per_read), "/ 3")
     if not ok_all:
         print("\nsome of the minimum requirements are not met!")
-
-
+ 
+ 
 if __name__ == "__main__":
     main()
