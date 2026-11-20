@@ -3,7 +3,7 @@ sposób wywołania kodu:
 
 python evaluate.py reads1.fasta output.txt reads1.txt
 python evaluate.py reads_unmappable.fasta output.txt
-python evaluate.py reads1.fasta output.txt reads1.txt --mapper mapper.py --ref reference.fasta
+python evaluate.py reads1.fasta output.txt reads1.txt --mapper main.py --ref reference.fasta
 
 '''
 
@@ -132,7 +132,7 @@ def main():
     parser.add_argument("reads", help="reads fasta file")
     parser.add_argument("output", help="mapper output file (created if --mapper is used)")
     parser.add_argument("expected", nargs="?", help="file with true coordinates (leave out for unmappable reads)")
-    parser.add_argument("--mapper", help="path to mapper.py, it will be run before the evaluation")
+    parser.add_argument("--mapper", help="path to main.py, it will be run before the evaluation")
     parser.add_argument("--ref", help="reference fasta (needed with --mapper)")
     parser.add_argument("--time", type=float, help="running time in seconds (if you ran the mapper by hand)")
     args = parser.parse_args()
