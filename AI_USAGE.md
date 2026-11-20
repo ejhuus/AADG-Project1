@@ -10,6 +10,7 @@ The AI was used as a helper, it helped with:
 - **Project scaffold**
 - **Implementing pipeline steps**
 - **README**
+- **Improving code**
 
 ## Prompts
 
@@ -20,3 +21,4 @@ The AI was used as a helper, it helped with:
 6. Explain how this works.
 7. Implement building the reference index.
 10. Update the README to match the code.
+11. Help me improve this code.
